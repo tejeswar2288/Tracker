@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WWW Tracker — Data Migration Tool</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#f8fafc;color:#1e293b;padding:40px;max-width:800px;margin:0 auto}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px}
+  .sub{color:#64748b;font-size:14px;margin-bottom:28px}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:20px}
+  .card h2{font-size:15px;font-weight:600;margin:0 0 12px}
+  .stat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+  .badge{background:#f1f5f9;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:500}
+  .badge span{font-size:20px;font-weight:700;display:block;color:#3b82f6}
+  button{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer}
+  button:disabled{background:#94a3b8;cursor:not-allowed}
+  button.danger{background:#ef4444}
+  #log{background:#0f172a;color:#94a3b8;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;max-height:350px;overflow-y:auto;display:none;margin-top:16px}
+  .log-ok{color:#4ade80}.log-err{color:#f87171}.log-info{color:#60a5fa}
+  .progress{height:6px;background:#e2e8f0;border-radius:3px;margin:12px 0}
+  .progress-fill{height:100%;border-radius:3px;background:#3b82f6;width:0%;transition:width .3s}
+  #noData{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:16px;font-size:13px;display:none}
+  #done{background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:16px;font-size:13px;display:none}
+</style>
+</head>
+<body>
+
+<h1>🔄 Data Migration Tool</h1>
+<p class="sub">Reads your existing localStorage data and imports it into PostgreSQL</p>
+
+<div id="noData">
+  ⚠️ <strong>No localStorage data found.</strong> Key <code>wwwtracker_v3</code> is empty or missing in this browser.
+  Make sure you're opening this page from <strong>http://localhost:3000/migrate.html</strong> in the same browser you used the old app in.
+</div>
+
+<div id="done">
+  ✅ <strong>Migration complete!</strong> Go to <a href="/">http://localhost:3000</a> and log in as Admin to see your data.
+</div>
+
+<div class="card" id="previewCard" style="display:none">
+  <h2>📦 Found in localStorage</h2>
+  <div class="stat" id="statRow"></div>
+  <div style="font-size:12px;color:#64748b;margin-bottom:16px">
+    Migration will: create users from manager names → create projects → create tasks with assignees → seed role capabilities.
+  </div>
+  <div class="progress"><div class="progress-fill" id="progressBar"></div></div>
+  <button id="migrateBtn" onclick="startMigration()">▶ Start Migration</button>
+  <button onclick="clearLocalStorage()" class="danger" style="margin-left:10px;background:#fff;color:#ef4444;border:1px solid #ef4444">🗑 Clear localStorage after migration</button>
+</div>
+
+<div id="log"></div>
+
+<script>
+const SKEY = 'wwwtracker_v3';
+let DB = null;
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  el.innerHTML += `<div class="${cls ? 'log-'+cls : ''}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function apiFetch(method, path, body) {
+  const opts = { method, credentials:'include', headers:{'Content-Type':'application/json'} };
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Load and preview ───────────────────────────────────
+window.onload = function() {
+  try {
+    const raw = localStorage.getItem(SKEY);
+    if(!raw) { document.getElementById('noData').style.display='block'; return; }
+    DB = JSON.parse(raw);
+    const projects = Object.values(DB.projects || {});
+    const tasks = Object.values(DB.tasks || {});
+    const users = DB.users || [];
+
+    // Collect all manager names
+    const managerNames = new Set();
+    projects.forEach(p => {
+      (p.managers||[]).forEach(n=>managerNames.add(n.trim()));
+      (p.tempManagers||[]).forEach(n=>managerNames.add(n.trim()));
+    });
+
+    document.getElementById('previewCard').style.display='block';
+    document.getElementById('statRow').innerHTML = [
+      ['Projects', projects.length],
+      ['Tasks', tasks.length],
+      ['Named Users', users.length],
+      ['Manager Names', managerNames.size],
+    ].map(([l,v]) => `<div class="badge"><span>${v}</span>${l}</div>`).join('');
+  } catch(e) {
+    document.getElementById('noData').style.display='block';
+    document.getElementById('noData').innerHTML += `<br><code>${e.message}</code>`;
+  }
+};
+
+// ── Migration ──────────────────────────────────────────
+async function startMigration() {
+  document.getElementById('migrateBtn').disabled = true;
+  const projects = Object.values(DB.projects || {});
+  const tasks = Object.values(DB.tasks || {});
+  const existingUsers = DB.users || [];
+
+  // Collect all names that appear as managers or in who field
+  const allNames = new Set(['Admin']);
+  projects.forEach(p => {
+    (p.managers||[]).forEach(n=>{if(n.trim())allNames.add(n.trim())});
+    (p.tempManagers||[]).forEach(n=>{if(n.trim())allNames.add(n.trim())});
+  });
+  tasks.forEach(t => {
+    (t.who||'').split(/[\/,+&]/).map(s=>s.trim()).filter(Boolean).forEach(n=>allNames.add(n));
+  });
+  existingUsers.forEach(u => { if(u.name) allNames.add(u.name); });
+
+  const total = allNames.size + projects.length + tasks.length + 1;
+  let done = 0;
+
+  function setProgress(n) {
+    document.getElementById('progressBar').style.width = Math.round((n/total)*100)+'%';
+  }
+
+  // 1. Create / find users
+  log('── Step 1: Creating users ──', 'info');
+  const userMap = {}; // name -> id
+
+  for (const name of allNames) {
+    try {
+      // Use bootstrap endpoint — works even on empty DB (no login required)
+      const existing = await apiFetch('GET', '/users').catch(() => []);
+      const found = existing.find(u => u.name.toLowerCase() === name.toLowerCase());
+      if(found) {
+        userMap[name] = found.id;
+        log(`  already exists: ${name} (${found.role})`, 'ok');
+      } else {
+        const userRecord = existingUsers.find(u => u.name === name);
+        const role = name === 'Admin' ? 'admin' : (userRecord?.role || 'doer');
+        const email = userRecord?.email || null;
+        // Use bootstrap endpoint (no auth required on empty DB)
+        const res = await fetch('/api/bootstrap/user', {
+          method: 'POST', credentials: 'include',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({name, email, role})
+        });
+        const created = await res.json();
+        if (!res.ok) throw new Error(created.error || `HTTP ${res.status}`);
+        userMap[name] = created.id;
+        log(`  created: ${name} (${role})`, 'ok');
+      }
+    } catch(e) {
+      log(`  Failed user "${name}": ${e.message}`, 'err');
+    }
+    done++; setProgress(done); await sleep(100);
+  }
+
+  // Auto-login as Admin so project/task API calls succeed
+  log('── Auto-login as Admin ──', 'info');
+  try {
+    const loginRes = await fetch('/api/auth/login', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: 'Admin'})
+    });
+    const loginData = await loginRes.json();
+    if (!loginRes.ok) throw new Error(loginData.error);
+    log(`  Logged in as Admin (${loginData.role})`, 'ok');
+  } catch(e) {
+    log(`  Auto-login failed: ${e.message}`, 'err');
+  }
+
+  // 2. Create projects
+  log('── Step 2: Creating projects ──', 'info');
+  const projMap = {}; // old id -> new id
+
+  for (const p of projects) {
+    try {
+      const managerNames = [...(p.managers||[]), ...(p.tempManagers||[])].map(n=>n.trim()).filter(Boolean);
+      const manager_ids = managerNames.map(n=>userMap[n]).filter(Boolean);
+      const created_by = manager_ids[0] || userMap['Admin'];
+      const created = await apiFetch('POST', '/projects', {
+        name: p.name,
+        description: p.desc || p.description || '',
+        color_index: p.colorIdx || p.color_index || 0,
+        manager_ids,
+        created_by
+      });
+      projMap[p.id] = created.id;
+      log(`  ✅ Project: ${p.name}`, 'ok');
+    } catch(e) {
+      log(`  ❌ Failed project "${p.name}": ${e.message}`, 'err');
+    }
+    done++; setProgress(done); await sleep(150);
+  }
+
+  // 3. Create tasks
+  log('── Step 3: Creating tasks ──', 'info');
+
+  for (const t of tasks) {
+    const newProjId = projMap[t.projectId || t.project_id];
+    if(!newProjId) { log(`  ⚠ Skipping task "${t.activity}" — project not found`, 'err'); done++; setProgress(done); continue; }
+
+    try {
+      // Map who string to user ids
+      const whoNames = (t.who||'').split(/[\/,+&]/).map(s=>s.trim()).filter(Boolean);
+      const assignee_ids = whoNames.map(n => {
+        const key = Object.keys(userMap).find(k => k.toLowerCase() === n.toLowerCase());
+        return key ? userMap[key] : null;
+      }).filter(Boolean);
+
+      const priority = t.priority === 1 ? 'high' : t.priority === 3 ? 'low' : 'medium';
+      const status = t.status || 'pending';
+
+      const created = await apiFetch('POST', '/tasks', {
+        project_id: newProjId,
+        activity: t.activity || t.act || 'Untitled Task',
+        action_steps: t.what || t.action_steps || '',
+        priority,
+        deadline: t.deadline || null,
+        status,
+        support_needed: t.support || t.support_needed || '',
+        assignee_ids
+      });
+
+      // Migrate comments if any
+      if(t.comments && typeof t.comments === 'string' && t.comments.trim()) {
+        const adminId = userMap['Admin'];
+        if(adminId) {
+          await apiFetch('POST', `/tasks/${created.id}/comments`, { content: t.comments.trim() });
+        }
+      }
+
+      // Migrate history if any
+      if(Array.isArray(t.history) && t.history.length > 0) {
+        for(const h of t.history) {
+          try {
+            await apiFetch('PUT', `/tasks/${created.id}/status`, {
+              new_status: h.to || status,
+              reason: h.reason || '(migrated from history)',
+              new_deadline: h.dl || null
+            });
+          } catch(e2) { /* skip history errors */ }
+        }
+        // Restore actual status
+        await apiFetch('PUT', `/tasks/${created.id}/status`, { new_status: status, reason: 'Status restored after history migration' });
+      }
+
+      log(`  ✅ Task: ${t.activity?.slice(0,50)}`, 'ok');
+    } catch(e) {
+      log(`  ❌ Failed task "${t.activity}": ${e.message}`, 'err');
+    }
+    done++; setProgress(done); await sleep(120);
+  }
+
+  // 4. Seed role capabilities
+  log('── Step 4: Setting role capabilities ──', 'info');
+  try {
+    const caps = DB.roleCapabilities || {};
+    for(const role of ['admin','manager','doer']) {
+      const c = caps[role] || {};
+      await apiFetch('PUT', `/role-capabilities/${role}`, {
+        view_all_projects: !!(c.viewAllProjects),
+        create_projects:   !!(c.createProjects),
+        edit_own_projects: !!(c.editProjectsOwn),
+        view_own_projects: !!(c.viewProjectsOwn),
+        assign_tasks:      !!(c.assignTaskToDoers),
+        add_comments:      !!(c.addComments),
+        delete_projects:   role==='admin',
+        delete_tasks:      role==='admin'
+      });
+      log(`  ✅ Role capabilities set for: ${role}`, 'ok');
+    }
+  } catch(e) {
+    log(`  ⚠ Role capabilities: ${e.message}`, 'err');
+  }
+
+  setProgress(total);
+  log('', '');
+  log('🎉 Migration complete! All data is now in PostgreSQL.', 'ok');
+  log('→ Go to http://localhost:3000 and log in as "Admin"', 'info');
+  document.getElementById('done').style.display='block';
+  document.getElementById('done').scrollIntoView({behavior:'smooth'});
+}
+
+function clearLocalStorage() {
+  if(confirm('This will permanently delete the localStorage data. Only do this after migration is complete and verified.')) {
+    localStorage.removeItem(SKEY);
+    alert('localStorage cleared.');
+  }
+}
+</script>
+</body>
+</html>

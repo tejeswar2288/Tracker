@@ -1,0 +1,26 @@
+{
+  "name": "tracker",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node -c server.js && node -c database.js && node -c routes/auth.js && node -c routes/users.js && node -c routes/projects.js && node -c routes/tasks.js && node -c routes/role_capabilities.js && node -c routes/email.js && node -c services/email.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "handlebars": "^4.7.9",
+    "nodemailer": "^8.0.7",
+    "pg": "^8.20.0"
+  }
+}
