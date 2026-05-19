@@ -1,0 +1,34 @@
+name: Deploy Tracker App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+
+        with:
+          host: 3.27.130.72
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            cd /var/www/tracker || exit 1
+
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/tejeswar2288/Tracker.git .
+            fi
+
+            git pull origin main
+
+            npm ci
+
+            pm2 restart tracker || pm2 start server.js --name tracker
+
+            pm2 save
