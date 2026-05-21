@@ -3,3 +3,4 @@ node_modules/
 *.log
 .DS_Store
 *.pem
+app_analysis_v2.md

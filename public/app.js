@@ -167,8 +167,6 @@ let selectedProjId=null, sortF='deadline', sortD=1, currentTasksCache=[];
 async function renderManager() {
   document.getElementById('btnNewProj').style.display='inline-flex';
   document.getElementById('btnNewProj').disabled=!hasRoleCap(S.role,'create_projects');
-  const btnNewUser = document.getElementById('btnNewUser');
-  if(btnNewUser) btnNewUser.style.display = S.role==='admin' ? 'inline-flex' : 'none';
   document.getElementById('projGrid').innerHTML=`<div class="scard"><div class="sc-label">Loading...</div></div>`;
   try {
     const projects = await api('GET','/projects');
