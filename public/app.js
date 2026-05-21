@@ -168,7 +168,7 @@ async function renderManager() {
   document.getElementById('btnNewProj').style.display='inline-flex';
   document.getElementById('btnNewProj').disabled=!hasRoleCap(S.role,'create_projects');
   const btnNewUser = document.getElementById('btnNewUser');
-  if(btnNewUser) btnNewUser.style.display = S.role==='admin' ? 'inline-flex' : 'none';
+  if(btnNewUser) btnNewUser.style.display = (S.role==='admin' || S.role==='manager') ? 'inline-flex' : 'none';
   document.getElementById('projGrid').innerHTML=`<div class="scard"><div class="sc-label">Loading...</div></div>`;
   try {
     const projects = await api('GET','/projects');
@@ -468,7 +468,7 @@ async function deleteUser(userId,name){
   try{await api('DELETE',`/users/${userId}`);showSaved();renderUserAccess();buildLoginDropdown();}catch(e){alert(e.message);}
 }
 async function openNewUserModal(){
-  if(S.role!=='admin'){alert('Only Admin can add users.');return;}
+  if(S.role!=='admin' && S.role!=='manager'){alert('Only Admin or Manager can add users.');return;}
   document.getElementById('userModalTitle').textContent='Add New User';
   document.getElementById('userEditName').value='';document.getElementById('umName').value='';document.getElementById('umEmail').value='';
   const sel=document.getElementById('umProject');
@@ -477,7 +477,7 @@ async function openNewUserModal(){
   document.getElementById('modalNewUser').classList.add('open');
 }
 async function saveNewUser(){
-  if(S.role!=='admin'){alert('Only Admin can save user changes.');return;}
+  if(S.role!=='admin' && S.role!=='manager'){alert('Only Admin or Manager can save user changes.');return;}
   const name=document.getElementById('umName').value.trim();
   const email=document.getElementById('umEmail').value.trim().toLowerCase();
   const project_id=document.getElementById('umProject').value;
