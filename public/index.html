@@ -92,8 +92,10 @@ header{background:var(--text);color:#fff;padding:0 24px;display:flex;align-items
 .btn-sm{font-size:11px;padding:4px 9px}
 .btn-danger{color:var(--red-t);border-color:rgba(185,28,28,.25)}
 .btn-danger:hover{background:var(--red-bg)}
-.btn-mail{color:var(--blue-t);border-color:rgba(29,78,216,.25);padding:4px 7px;font-size:13px;line-height:1}
+.btn-mail{color:var(--blue-t);border-color:rgba(29,78,216,.25);padding:4px 7px;font-size:13px;line-height:1;min-width:28px;justify-content:center}
 .btn-mail:hover{background:var(--blue-bg);border-color:rgba(29,78,216,.4)}
+.btn-add{color:var(--text);border-color:var(--border-s);padding:4px 7px;font-size:13px;font-weight:600;line-height:1;min-width:28px;justify-content:center}
+.btn-add:hover{background:var(--s3);border-color:var(--border-m)}
 .btn-ghost{border-color:transparent;background:transparent;color:var(--t2)}
 .btn-ghost:hover{background:var(--s3);border-color:var(--border-s);color:var(--text)}
 
@@ -218,7 +220,10 @@ td{padding:9px 12px;vertical-align:top}
 .d-pending{background:#94a3b8}.d-inprogress{background:var(--blue)}.d-review{background:var(--purple)}.d-deferred{background:var(--amber)}.d-blocked{background:var(--red)}.d-done{background:var(--green)}
 .task-what{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5;max-width:270px}
 .who-cell{font-size:12px;color:var(--t2);max-width:140px;line-height:1.5}
-.sup-cell{font-size:12px;color:var(--t3);font-style:italic;max-width:160px}
+.sup-cell{font-size:12px;color:var(--t2);max-width:200px;line-height:1.45}
+.sup-sn{font-style:italic;color:var(--t3);margin-bottom:4px}
+.sup-cmt{font-style:normal;color:var(--text);margin-top:3px;padding-top:3px;border-top:1px dashed var(--border)}
+.sup-cmt:first-child{border-top:none;padding-top:0;margin-top:0}
 
 /* deadline */
 .dl-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:11px;padding:2px 8px;border-radius:5px;white-space:nowrap}
@@ -257,6 +262,11 @@ textarea.cmt-ta:focus{border-color:var(--blue);background:var(--surface);border-
 textarea.cmt-ta::placeholder{color:var(--t3);font-style:italic}
 textarea.cmt-ta:read-only{border-style:dashed;opacity:.7;cursor:default}
 .cmt-ts{font-size:10px;color:var(--t3);font-family:'DM Mono',monospace;margin-top:2px}
+.cmt-item{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;font-size:12px;line-height:1.5;color:var(--text)}
+.cmt-item-body{flex:1;word-break:break-word}
+.cmt-item-meta{font-size:10px;color:var(--t3);margin-top:2px;font-family:'DM Mono',monospace}
+.cmt-del-btn{flex-shrink:0;background:none;border:1px solid rgba(185,28,28,.25);color:var(--red-t);font-size:11px;padding:2px 7px;border-radius:5px;cursor:pointer;transition:all .12s}
+.cmt-del-btn:hover{background:var(--red-bg);border-color:var(--red)}
 
 /* history */
 .hist-btn{font-size:10px;color:var(--blue);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;display:block;margin-top:3px;text-align:left}
@@ -313,6 +323,13 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
 /* animations */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .proj-card,.doer-proj-wrap,.scard{animation:fadeUp .22s ease both}
+
+/* inline new task row */
+@keyframes slideInRow{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+#inline-new-task-row{animation:slideInRow .18s ease both}
+#inline-new-task-row td{padding:8px 10px;vertical-align:top}
+#inline-new-task-row .fi{font-size:12px;padding:5px 8px;border-radius:6px}
+#inline-new-task-row input#it-name:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,78,216,.12)}
 </style>
 </head>
 <body>
@@ -429,7 +446,7 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
                 <th class="sort-col" onclick="doSort('deadline')">Deadline (When) </th>
                 <th class="sort-col" onclick="doSort('status')">Status  <span style="font-size:9px;opacity:.5;font-weight:400;text-transform:none;">(editable)</span></th>
                 <th>Comments</th>
-                <th>Support Needed</th>
+                <th>Support Required</th>
                 <th></th>
               </tr></thead>
               <tbody id="tBody"></tbody>
@@ -540,6 +557,10 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
       </select>
     </div>
     <div class="field"><label class="field-label">Support Required</label><input class="fi" id="tmSupport" placeholder="e.g. Approval from Patil ji"></div>
+    <div class="field" id="tmCommentsSection" style="display:none">
+      <label class="field-label">Comments</label>
+      <div id="tmCommentsList"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalTask')">Cancel</button>
       <button class="btn btn-primary" onclick="saveTask()">Save Task</button>

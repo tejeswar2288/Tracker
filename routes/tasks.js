@@ -23,7 +23,13 @@ router.get('/', async (request, response) => {
 
         let query = `
             SELECT tasks.*,
-                STRING_AGG(DISTINCT users.name, ' / ' ORDER BY users.name) AS assignees
+                STRING_AGG(DISTINCT users.name, ' / ' ORDER BY users.name) AS assignees,
+                (SELECT c.body
+                 FROM comments c
+                 WHERE c.task_id = tasks.id AND c.deleted_at IS NULL
+                 ORDER BY c.created_at DESC
+                 LIMIT 1
+                ) AS task_comments
             FROM tasks
             LEFT JOIN task_assignees ON task_assignees.task_id = tasks.id
             LEFT JOIN users ON users.id = task_assignees.user_id AND users.deleted_at IS NULL
@@ -71,7 +77,13 @@ router.get('/my-tasks', async (request, response) => {
         const result = await pool.query(
             `SELECT tasks.*,
                 projects.name AS project_name,
-                STRING_AGG(DISTINCT all_assignees.name, ' / ' ORDER BY all_assignees.name) AS assignees
+                STRING_AGG(DISTINCT all_assignees.name, ' / ' ORDER BY all_assignees.name) AS assignees,
+                (SELECT c.body
+                 FROM comments c
+                 WHERE c.task_id = tasks.id AND c.deleted_at IS NULL
+                 ORDER BY c.created_at DESC
+                 LIMIT 1
+                ) AS task_comments
              FROM task_assignees
              JOIN tasks ON tasks.id = task_assignees.task_id AND tasks.deleted_at IS NULL
              JOIN projects ON projects.id = tasks.project_id AND projects.deleted_at IS NULL
@@ -126,7 +138,7 @@ router.get('/:id', async (request, response) => {
             `SELECT comments.*, users.name AS author_name
              FROM comments
              LEFT JOIN users ON users.id = comments.author_id
-             WHERE comments.task_id = $1
+             WHERE comments.task_id = $1 AND comments.deleted_at IS NULL
              ORDER BY comments.created_at DESC`,
             [task.id]
         );
@@ -392,7 +404,7 @@ router.get('/:id/comments', async (request, response) => {
             `SELECT comments.*, users.name AS author_name
              FROM comments
              LEFT JOIN users ON users.id = comments.author_id
-             WHERE comments.task_id = $1
+             WHERE comments.task_id = $1 AND comments.deleted_at IS NULL
              ORDER BY comments.created_at DESC`,
             [request.params.id]
         );
@@ -400,6 +412,27 @@ router.get('/:id/comments', async (request, response) => {
     } catch (error) {
         console.error('Error fetching comments:', error);
         response.status(500).json({ error: 'Failed to fetch comments' });
+    }
+});
+
+// DELETE /api/tasks/:taskId/comments/:commentId — Soft delete a comment
+router.delete('/:taskId/comments/:commentId', async (request, response) => {
+    try {
+        const { taskId, commentId } = request.params;
+
+        const result = await pool.query(
+            'UPDATE comments SET deleted_at = NOW() WHERE id = $1 AND task_id = $2 AND deleted_at IS NULL RETURNING *',
+            [commentId, taskId]
+        );
+
+        if (result.rows.length === 0) {
+            return response.status(404).json({ error: 'Comment not found' });
+        }
+
+        response.json({ message: 'Comment deleted' });
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        response.status(500).json({ error: 'Failed to delete comment' });
     }
 });
 
