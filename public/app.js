@@ -13,20 +13,6 @@ const STAT_DOT = {pending:'d-pending',inprogress:'d-inprogress',review:'d-review
 const PORDER = {pending:0,inprogress:1,review:2,deferred:3,blocked:4,done:5};
 const PRIO_CLS = {high:'prio-high',medium:'prio-med',low:'prio-low'};
 const PRIO_VAL = {high:1,medium:2,low:3};
-const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-function commentsToText(comments){
-  if(!comments?.length) return '';
-  return comments[0]?.body||'';
-}
-function supportCellHtml(t){
-  const sn=(t.support_needed||'').trim();
-  const cm=(t.task_comments||commentsToText(t.comments)||'').trim();
-  if(!sn&&!cm) return '-';
-  let html='';
-  if(sn) html+=`<div class="sup-sn">${escHtml(sn)}</div>`;
-  if(cm) html+=cm.split('\n').filter(Boolean).map(line=>`<div class="sup-cmt">${escHtml(line)}</div>`).join('');
-  return html;
-}
 
 // -- API HELPER --
 async function api(method, path, body) {
@@ -177,6 +163,8 @@ async function renderDoer() {
 
 // -- MANAGER VIEW --
 let selectedProjId=null, sortF='deadline', sortD=1, currentTasksCache=[];
+let currentPage=1;
+const TASKS_PER_PAGE=15;
 
 async function renderManager() {
   document.getElementById('btnNewProj').style.display='inline-flex';
@@ -227,6 +215,7 @@ async function renderManager() {
 
 async function openProject(pid) {
   selectedProjId=pid;
+  currentPage=1;
   document.getElementById('taskSection').style.display='block';
   const projects = await api('GET','/projects');
   const p=projects.find(x=>x.id===pid)||{name:'',description:''};
@@ -248,7 +237,7 @@ async function renderTasks() {
   const canComment=hasRoleCap(S.role,'add_comments');
   try {
     let tasks = await api('GET',`/tasks?project_id=${selectedProjId}`);
-    if(q) tasks=tasks.filter(t=>[t.activity,t.action_steps,t.support_needed,t.task_comments,t.assignees].join(' ').toLowerCase().includes(q));
+    if(q) tasks=tasks.filter(t=>[t.activity,t.action_steps,t.support_needed,t.assignees].join(' ').toLowerCase().includes(q));
     if(sf) tasks=tasks.filter(t=>t.status===sf);
     // Populate SPOC filter
     const spocs=new Set(); tasks.forEach(t=>(t.assignees||'').split(' / ').filter(Boolean).forEach(s=>spocs.add(s)));
@@ -257,15 +246,26 @@ async function renderTasks() {
     if(sw) tasks=tasks.filter(t=>(t.assignees||'').toLowerCase().includes(sw.toLowerCase()));
     // Tasks are returned in creation order (created_at ASC) from the backend — no client sort
     currentTasksCache=tasks;
-    document.getElementById('tEmpty').style.display=tasks.length===0?'block':'none';
-    document.getElementById('tFoot').textContent=`Showing ${tasks.length} tasks`;
-    document.getElementById('tBody').innerHTML=tasks.map((t,i)=>{
+    const totalTasks=tasks.length;
+    const totalPages=Math.max(1,Math.ceil(totalTasks/TASKS_PER_PAGE));
+    if(currentPage>totalPages) currentPage=totalPages;
+    if(currentPage<1) currentPage=1;
+    const startIdx=(currentPage-1)*TASKS_PER_PAGE;
+    const endIdx=Math.min(startIdx+TASKS_PER_PAGE,totalTasks);
+    const pageTasks=tasks.slice(startIdx,endIdx);
+    document.getElementById('tEmpty').style.display=totalTasks===0?'block':'none';
+    document.getElementById('tFootText').textContent=`Showing ${startIdx+1}–${endIdx} of ${totalTasks} tasks`;
+    // Render pagination
+    renderPagination(totalPages,totalTasks);
+    document.getElementById('tBody').innerHTML=pageTasks.map((t,i)=>{
+      const globalIdx=startIdx+i;
       const dc=dlCls(t.deadline),dn=dlNote(t.deadline),sc=STAT_CLS[t.status]||'ss-pending';
       const sopts=Object.entries(STAT_LABELS).map(([v,l])=>`<option value="${v}"${t.status===v?' selected':''}>${l}</option>`).join('');
       const prioCls=PRIO_CLS[t.priority]||'prio-med';
       const dlCell=t.status==='deferred'&&canEdit?`<input type="date" class="dl-edit" id="dl-input-${t.id}" value="${t.deadline||''}" onchange="quickDlChange('${t.id}',this.value)">`:`<span class="dl-badge ${dc}" id="dl-badge-${t.id}">${fmt(t.deadline)}</span>`;
-      return `<tr id="task-row-${t.id}">
-        <td class="rn">${String(i+1).padStart(2,'0')}</td>
+      const addBtn=canEdit?`<button class="add-row-btn" title="Insert new task below" onclick="addInlineTaskAfter('${t.id}',this)">+</button>`:'';
+      return `<tr data-task-id="${t.id}">
+        <td class="rn">${String(globalIdx+1).padStart(2,'0')}</td>
         <td><div class="task-act"><span class="task-dot ${STAT_DOT[t.status]}"></span>${t.activity}</div></td>
         <td><div class="task-what">${t.action_steps||'-'}</div></td>
         <td class="who-cell">${t.assignees||'-'}</td>
@@ -273,16 +273,42 @@ async function renderTasks() {
         <td>${dlCell}<div class="dl-note" id="dl-note-${t.id}">${dn}</div></td>
         <td><select class="ssel ${sc}" onchange="mgrStatusChange('${t.id}','${t.activity.replace(/'/g,"\\'")}',this.value,this,'${t.deadline||''}')" ${canEdit?'':'disabled'}>${sopts}</select></td>
         <td><textarea class="cmt-ta" rows="2" placeholder="Add comment..." onblur="saveCmt('${t.id}',this,'mcmtts-${t.id}')" ${canComment?'':'readonly'}></textarea><div class="cmt-ts" id="mcmtts-${t.id}"></div></td>
-        <td class="sup-cell" id="sup-${t.id}">${supportCellHtml(t)}</td>
+        <td class="sup-cell">${t.support_needed||'-'}</td>
         <td style="white-space:nowrap">
           ${canEdit?`<button class="btn btn-sm" onclick="openTaskModal('${t.id}')">Edit</button> `:''}
           ${S.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="confirmDelTask('${t.id}','${t.activity.replace(/'/g,"\\'")}')">Del</button> `:''}
           <button class="btn btn-sm btn-mail" title="Send reminder email" onclick="sendTaskMail('${t.id}','${t.activity.replace(/'/g,"\\'")}')">&#9993;</button>
-          ${canEdit?` <button type="button" class="btn btn-sm btn-add" title="Add task below" onclick="addInlineTask('${t.id}')">+</button>`:''}
+          ${addBtn}
         </td>
       </tr>`;
     }).join('');
   } catch(e){ document.getElementById('tBody').innerHTML=`<tr><td colspan="10" style="color:red;padding:20px">${e.message}</td></tr>`; }
+}
+
+// -- PAGINATION -------------------------------------------
+function renderPagination(totalPages,totalTasks){
+  const pg=document.getElementById('tPagination');
+  if(totalPages<=1){pg.innerHTML='';return;}
+  let html='';
+  html+=`<button class="pg-btn" ${currentPage===1?'disabled':''} onclick="goToPage(1)" title="First page">&laquo;</button>`;
+  html+=`<button class="pg-btn" ${currentPage===1?'disabled':''} onclick="goToPage(${currentPage-1})" title="Previous">&lsaquo;</button>`;
+  // Show page numbers
+  let startP=Math.max(1,currentPage-2);
+  let endP=Math.min(totalPages,startP+4);
+  if(endP-startP<4) startP=Math.max(1,endP-4);
+  if(startP>1) html+='<span class="pg-info">...</span>';
+  for(let p=startP;p<=endP;p++){
+    html+=`<button class="pg-btn ${p===currentPage?'pg-active':''}" onclick="goToPage(${p})">${p}</button>`;
+  }
+  if(endP<totalPages) html+='<span class="pg-info">...</span>';
+  html+=`<button class="pg-btn" ${currentPage===totalPages?'disabled':''} onclick="goToPage(${currentPage+1})" title="Next">&rsaquo;</button>`;
+  html+=`<button class="pg-btn" ${currentPage===totalPages?'disabled':''} onclick="goToPage(${totalPages})" title="Last page">&raquo;</button>`;
+  pg.innerHTML=html;
+}
+function goToPage(p){
+  currentPage=p;
+  renderTasks();
+  document.getElementById('taskSection').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // -- STATUS CHANGE --------------------------------------
@@ -339,21 +365,10 @@ async function sendTaskMail(taskId, activityName) {
 }
 
 async function saveCmt(taskId,ta,tsId){
-  const taEl=typeof ta==='string'?document.getElementById(ta):ta;
-  const content=(taEl?.value||'').trim();
-  if(!content)return;
-  try{
-    await api('POST',`/tasks/${taskId}/comments`,{content});
-    if(taEl) taEl.value='';
-    const el=document.getElementById(tsId);
-    if(el) el.textContent='Saved '+fmtTs(Date.now());
-    const task=await api('GET',`/tasks/${taskId}`);
-    const supEl=document.getElementById('sup-'+taskId);
-    if(supEl) supEl.innerHTML=supportCellHtml(task);
-    const cached=currentTasksCache.find(t=>t.id===taskId);
-    if(cached){ cached.support_needed=task.support_needed; cached.task_comments=task.comments?.[0]?.body||''; }
-    showSaved();
-  }catch(e){alert('Failed to save comment: '+e.message);}
+  const content=typeof ta==='string'?document.getElementById(ta).value:ta.value;
+  if(!content.trim())return;
+  try{await api('POST',`/tasks/${taskId}/comments`,{content});const el=document.getElementById(tsId);if(el)el.textContent='Saved '+fmtTs(Date.now());showSaved();}
+  catch(e){alert('Failed to save comment: '+e.message);}
 }
 
 // -- PROJECT CRUD ---------------------------------------
@@ -404,72 +419,92 @@ function confirmDelProject(pid,name){
 }
 
 // -- TASK CRUD ------------------------------------------
-function addInlineTask(afterTaskId){
-  const tbody=document.getElementById('tBody');
-  document.getElementById('tEmpty').style.display='none';
-  const existing=document.getElementById('inline-new-task-row');
-  if(existing){
-    if(afterTaskId){
-      const afterRow=document.getElementById('task-row-'+afterTaskId);
-      if(afterRow) afterRow.insertAdjacentElement('afterend', existing);
-      else tbody.appendChild(existing);
-    } else tbody.appendChild(existing);
-    document.getElementById('it-name')?.focus();
-    return;
-  }
+let _inlineRowCounter=0;
+
+function _createInlineRowHtml(uid, num){
   const userOpts=ALL_USERS.map(u=>`<option value="${u.name}">${u.name}</option>`).join('');
   const statusOpts=Object.entries(STAT_LABELS).map(([v,l])=>`<option value="${v}"${v==='pending'?' selected':''}>${l}</option>`).join('');
-  const row=document.createElement('tr');
-  row.id='inline-new-task-row';
-  row.style.background='var(--blue-bg)';
-  row.innerHTML=`
-    <td class="rn" style="color:var(--blue-t);font-weight:700">NEW</td>
-    <td><input id="it-name" class="fi" style="min-width:160px;font-size:12px;padding:5px 8px" placeholder="Task / Activity name *" autofocus></td>
-    <td><textarea id="it-what" class="fi" rows="2" style="min-width:140px;font-size:12px;padding:5px 8px;resize:none" placeholder="Action steps"></textarea></td>
-    <td><input id="it-who" class="fi" style="min-width:110px;font-size:12px;padding:5px 8px" list="it-who-list" placeholder="SPOC name"><datalist id="it-who-list">${userOpts}</datalist></td>
-    <td><select id="it-priority" class="ssel prio-sel prio-med" style="min-width:100px">
+  return `
+    <td class="rn" style="color:var(--blue-t);font-weight:700">${num}</td>
+    <td><input class="fi it-name-field" data-uid="${uid}" style="min-width:160px;font-size:12px;padding:5px 8px" placeholder="Task / Activity name *"></td>
+    <td><textarea class="fi it-what-field" data-uid="${uid}" rows="2" style="min-width:140px;font-size:12px;padding:5px 8px;resize:none" placeholder="Action steps"></textarea></td>
+    <td><input class="fi it-who-field" data-uid="${uid}" style="min-width:110px;font-size:12px;padding:5px 8px" list="it-who-list-${uid}" placeholder="SPOC name"><datalist id="it-who-list-${uid}">${userOpts}</datalist></td>
+    <td><select class="ssel prio-sel prio-med it-priority-field" data-uid="${uid}" style="min-width:100px">
       <option value="high">High</option>
       <option value="medium" selected>Medium</option>
       <option value="low">Low</option>
     </select></td>
-    <td><input id="it-dl" type="date" class="fi" style="font-size:12px;padding:5px 8px"></td>
-    <td><select id="it-status" class="ssel ss-pending" style="min-width:115px">${statusOpts}</select></td>
-    <td><textarea id="it-comment" class="cmt-ta" rows="2" placeholder="Comment (optional)"></textarea></td>
-    <td><input id="it-support" class="fi" style="min-width:110px;font-size:12px;padding:5px 8px" placeholder="Support required"></td>
+    <td><input class="fi it-dl-field" data-uid="${uid}" type="date" style="font-size:12px;padding:5px 8px"></td>
+    <td><select class="ssel ss-pending it-status-field" data-uid="${uid}" style="min-width:115px">${statusOpts}</select></td>
+    <td><textarea class="cmt-ta it-comment-field" data-uid="${uid}" rows="2" placeholder="Comment (optional)"></textarea></td>
+    <td><input class="fi it-support-field" data-uid="${uid}" style="min-width:110px;font-size:12px;padding:5px 8px" placeholder="Support needed"></td>
     <td style="white-space:nowrap;vertical-align:middle">
-      <button class="btn btn-primary btn-sm" onclick="saveInlineTask()">Save</button>
-      <button class="btn btn-sm" style="margin-left:4px" onclick="cancelInlineTask()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveInlineRow('${uid}')">Save</button>
+      <button class="btn btn-sm" style="margin-left:4px" onclick="cancelInlineRow('${uid}')">Cancel</button>
     </td>`;
-  if(afterTaskId){
-    const afterRow=document.getElementById('task-row-'+afterTaskId);
-    if(afterRow) afterRow.insertAdjacentElement('afterend', row);
-    else tbody.appendChild(row);
-  } else tbody.appendChild(row);
-  document.getElementById('it-name').focus();
-  // live priority color
-  document.getElementById('it-priority').addEventListener('change',function(){this.className=`ssel prio-sel ${PRIO_CLS[this.value]||'prio-med'}`;});
-  document.getElementById('it-status').addEventListener('change',function(){this.className=`ssel ${STAT_CLS[this.value]||'ss-pending'}`;});
 }
-async function saveInlineTask(){
-  const activity=(document.getElementById('it-name').value||'').trim();
-  if(!activity){document.getElementById('it-name').focus();document.getElementById('it-name').style.borderColor='var(--red)';return;}
-  const whoNames=(document.getElementById('it-who').value||'').split(/[\/,+&]/).map(s=>s.trim()).filter(Boolean);
+
+function _insertInlineRow(afterElement, num){
+  const uid='ilr-'+(_inlineRowCounter++);
+  const row=document.createElement('tr');
+  row.id=uid;
+  row.className='inline-new-task-row';
+  row.style.background='var(--blue-bg)';
+  row.innerHTML=_createInlineRowHtml(uid, num);
+  const tbody=document.getElementById('tBody');
+  if(afterElement && afterElement.nextSibling){
+    tbody.insertBefore(row, afterElement.nextSibling);
+  } else {
+    // Always append at the END
+    tbody.appendChild(row);
+  }
+  // live color updates
+  row.querySelector('.it-priority-field').addEventListener('change',function(){this.className=`ssel prio-sel ${PRIO_CLS[this.value]||'prio-med'} it-priority-field`;});
+  row.querySelector('.it-status-field').addEventListener('change',function(){this.className=`ssel ${STAT_CLS[this.value]||'ss-pending'} it-status-field`;});
+  return row;
+}
+
+// Add a single new task row at end
+function addInlineTask(){
+  const existingInline=document.querySelectorAll('.inline-new-task-row').length;
+  const num=currentTasksCache.length+existingInline+1;
+  const row=_insertInlineRow(null, String(num).padStart(2,'0'));
+  row.querySelector('.it-name-field').focus();
+  row.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// Add a new task row AFTER a specific task row (triggered by the per-row + icon)
+function addInlineTaskAfter(taskId, btnEl){
+  const taskRow=btnEl.closest('tr');
+  const existingInline=document.querySelectorAll('.inline-new-task-row').length;
+  const num=currentTasksCache.length+existingInline+1;
+  const row=_insertInlineRow(taskRow, String(num).padStart(2,'0'));
+  row.querySelector('.it-name-field').focus();
+  row.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// Save an individual inline row
+async function saveInlineRow(uid){
+  const row=document.getElementById(uid);
+  if(!row) return;
+  const nameEl=row.querySelector('.it-name-field');
+  const activity=(nameEl.value||'').trim();
+  if(!activity){nameEl.focus();nameEl.style.borderColor='var(--red)';return;}
+  const whoNames=(row.querySelector('.it-who-field').value||'').split(/[\/,+&]/).map(s=>s.trim()).filter(Boolean);
   const assignee_ids=ALL_USERS.filter(u=>whoNames.some(n=>n.toLowerCase()===u.name.toLowerCase())).map(u=>u.id);
   const data={
     activity,
-    action_steps:(document.getElementById('it-what').value||'').trim(),
-    priority:document.getElementById('it-priority').value||'medium',
-    deadline:document.getElementById('it-dl').value||null,
-    status:document.getElementById('it-status').value||'pending',
-    support_needed:(document.getElementById('it-support').value||'').trim(),
+    action_steps:(row.querySelector('.it-what-field').value||'').trim(),
+    priority:row.querySelector('.it-priority-field').value||'medium',
+    deadline:row.querySelector('.it-dl-field').value||null,
+    status:row.querySelector('.it-status-field').value||'pending',
+    support_needed:(row.querySelector('.it-support-field').value||'').trim(),
     assignee_ids,
     project_id:selectedProjId
   };
   try{
-    const created=await api('POST','/tasks',data);
-    const cmt=(document.getElementById('it-comment')?.value||'').trim();
-    if(cmt&&created?.id) await api('POST',`/tasks/${created.id}/comments`,{content:cmt});
-    cancelInlineTask(true);
+    await api('POST','/tasks',data);
+    row.remove();
     showSaved();
     renderTasks();
     renderDoer();
@@ -477,11 +512,63 @@ async function saveInlineTask(){
     buildTabs();
   }catch(e){alert('Failed to save task: '+e.message);}
 }
-function cancelInlineTask(skipRefresh){
-  const row=document.getElementById('inline-new-task-row');
+
+// Cancel (remove) a single inline row
+function cancelInlineRow(uid){
+  const row=document.getElementById(uid);
   if(row) row.remove();
-  if(!skipRefresh && selectedProjId) renderTasks();
+  _renumberInlineRows();
 }
+
+// Renumber all inline rows sequentially after any add/remove
+function _renumberInlineRows(){
+  const rows=document.querySelectorAll('.inline-new-task-row');
+  const base=currentTasksCache.length;
+  rows.forEach((r,i)=>{
+    const td=r.querySelector('td.rn');
+    if(td) td.textContent=String(base+i+1).padStart(2,'0');
+  });
+}
+
+// Cancel ALL inline rows
+function cancelAllInlineRows(){
+  document.querySelectorAll('.inline-new-task-row').forEach(r=>r.remove());
+}
+
+// -- ADD TASKS MODAL ---------------------------
+function openAddTasksModal(){
+  document.getElementById('antRowCount').value=5;
+  document.getElementById('modalAddTasks').classList.add('open');
+  setTimeout(()=>document.getElementById('antRowCount').focus(),100);
+}
+async function confirmAddTaskRows(){
+  let count=parseInt(document.getElementById('antRowCount').value)||1;
+  if(count<1) count=1;
+  if(count>30) count=30;
+  closeModal('modalAddTasks');
+  // Remove any existing inline rows first
+  cancelAllInlineRows();
+  // Navigate to last page so we can see the appended rows
+  const totalPages=Math.max(1,Math.ceil(currentTasksCache.length/TASKS_PER_PAGE));
+  currentPage=totalPages;
+  // Wait for render to finish before inserting rows
+  await renderTasks();
+  // Add rows at the end
+  const baseNum=currentTasksCache.length;
+  for(let i=0;i<count;i++){
+    _insertInlineRow(null, String(baseNum+i+1).padStart(2,'0'));
+  }
+  // Focus the first new row's name field and scroll to it
+  const firstRow=document.querySelector('.inline-new-task-row');
+  if(firstRow){
+    firstRow.querySelector('.it-name-field').focus();
+    firstRow.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+}
+
+// Legacy compatibility: keep old function names working
+function addInlineTaskLegacy(){addInlineTask();}
+function cancelInlineTask(){cancelAllInlineRows();}
 async function openTaskModal(tid){
   if(!tid){addInlineTask();return;}
   document.getElementById('taskMTitle').textContent='Edit Task';
@@ -489,52 +576,8 @@ async function openTaskModal(tid){
   document.getElementById('tmName').value='';document.getElementById('tmWhat').value='';
   document.getElementById('tmWho').value='';document.getElementById('tmPriority').value='2';
   document.getElementById('tmDl').value='';document.getElementById('tmStatus').value='pending';document.getElementById('tmSupport').value='';
-  document.getElementById('tmCommentsSection').style.display='none';
-  document.getElementById('tmCommentsList').innerHTML='';
-  try{
-    const t=await api('GET',`/tasks/${tid}`);
-    document.getElementById('tmName').value=t.activity||'';
-    document.getElementById('tmWhat').value=t.action_steps||'';
-    document.getElementById('tmWho').value=t.assignees||'';
-    document.getElementById('tmPriority').value=t.priority==='high'?'1':t.priority==='low'?'3':'2';
-    document.getElementById('tmDl').value=t.deadline?String(t.deadline).split('T')[0]:'';
-    document.getElementById('tmStatus').value=t.status||'pending';
-    document.getElementById('tmSupport').value=t.support_needed||'';
-    if(t.comments&&t.comments.length>0){
-      document.getElementById('tmCommentsSection').style.display='block';
-      renderTaskComments(tid,t.comments);
-    }
-  }catch(e){console.error('openTaskModal error:',e);}
+  try{const t=await api('GET',`/tasks/${tid}`);document.getElementById('tmName').value=t.activity||'';document.getElementById('tmWhat').value=t.action_steps||'';document.getElementById('tmWho').value=t.assignees||'';document.getElementById('tmPriority').value=t.priority==='high'?'1':t.priority==='low'?'3':'2';document.getElementById('tmDl').value=t.deadline?String(t.deadline).split('T')[0]:'';document.getElementById('tmStatus').value=t.status||'pending';document.getElementById('tmSupport').value=t.support_needed||'';}catch(e){console.error('openTaskModal error:',e);}
   document.getElementById('modalTask').classList.add('open');
-}
-function renderTaskComments(taskId,comments){
-  const list=document.getElementById('tmCommentsList');
-  if(!comments||comments.length===0){
-    document.getElementById('tmCommentsSection').style.display='none';
-    list.innerHTML='';return;
-  }
-  list.innerHTML=comments.map(c=>`<div class="cmt-item" id="cmt-${c.id}">
-    <div class="cmt-item-body">${escHtml(c.body||'')}
-      <div class="cmt-item-meta">${escHtml(c.author_name||'Unknown')} &middot; ${fmtTs(c.created_at)}</div>
-    </div>
-    <button class="cmt-del-btn" onclick="deleteComment('${taskId}','${c.id}')" title="Delete comment">&#10005;</button>
-  </div>`).join('');
-}
-async function deleteComment(taskId,commentId){
-  if(!confirm('Delete this comment?'))return;
-  try{
-    await api('DELETE',`/tasks/${taskId}/comments/${commentId}`);
-    const el=document.getElementById('cmt-'+commentId);
-    if(el) el.remove();
-    // Check if any comments remain
-    const remaining=document.getElementById('tmCommentsList').querySelectorAll('.cmt-item');
-    if(remaining.length===0) document.getElementById('tmCommentsSection').style.display='none';
-    showSaved('Comment deleted');
-    // Refresh the support column in the background
-    const task=await api('GET',`/tasks/${taskId}`);
-    const supEl=document.getElementById('sup-'+taskId);
-    if(supEl) supEl.innerHTML=supportCellHtml(task);
-  }catch(e){alert('Failed to delete comment: '+e.message);}
 }
 async function saveTask(){
   const tid=document.getElementById('taskMId').value;

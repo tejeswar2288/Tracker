@@ -92,10 +92,8 @@ header{background:var(--text);color:#fff;padding:0 24px;display:flex;align-items
 .btn-sm{font-size:11px;padding:4px 9px}
 .btn-danger{color:var(--red-t);border-color:rgba(185,28,28,.25)}
 .btn-danger:hover{background:var(--red-bg)}
-.btn-mail{color:var(--blue-t);border-color:rgba(29,78,216,.25);padding:4px 7px;font-size:13px;line-height:1;min-width:28px;justify-content:center}
+.btn-mail{color:var(--blue-t);border-color:rgba(29,78,216,.25);padding:4px 7px;font-size:13px;line-height:1}
 .btn-mail:hover{background:var(--blue-bg);border-color:rgba(29,78,216,.4)}
-.btn-add{color:var(--text);border-color:var(--border-s);padding:4px 7px;font-size:13px;font-weight:600;line-height:1;min-width:28px;justify-content:center}
-.btn-add:hover{background:var(--s3);border-color:var(--border-m)}
 .btn-ghost{border-color:transparent;background:transparent;color:var(--t2)}
 .btn-ghost:hover{background:var(--s3);border-color:var(--border-s);color:var(--text)}
 
@@ -220,10 +218,7 @@ td{padding:9px 12px;vertical-align:top}
 .d-pending{background:#94a3b8}.d-inprogress{background:var(--blue)}.d-review{background:var(--purple)}.d-deferred{background:var(--amber)}.d-blocked{background:var(--red)}.d-done{background:var(--green)}
 .task-what{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5;max-width:270px}
 .who-cell{font-size:12px;color:var(--t2);max-width:140px;line-height:1.5}
-.sup-cell{font-size:12px;color:var(--t2);max-width:200px;line-height:1.45}
-.sup-sn{font-style:italic;color:var(--t3);margin-bottom:4px}
-.sup-cmt{font-style:normal;color:var(--text);margin-top:3px;padding-top:3px;border-top:1px dashed var(--border)}
-.sup-cmt:first-child{border-top:none;padding-top:0;margin-top:0}
+.sup-cell{font-size:12px;color:var(--t3);font-style:italic;max-width:160px}
 
 /* deadline */
 .dl-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:11px;padding:2px 8px;border-radius:5px;white-space:nowrap}
@@ -262,11 +257,6 @@ textarea.cmt-ta:focus{border-color:var(--blue);background:var(--surface);border-
 textarea.cmt-ta::placeholder{color:var(--t3);font-style:italic}
 textarea.cmt-ta:read-only{border-style:dashed;opacity:.7;cursor:default}
 .cmt-ts{font-size:10px;color:var(--t3);font-family:'DM Mono',monospace;margin-top:2px}
-.cmt-item{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;font-size:12px;line-height:1.5;color:var(--text)}
-.cmt-item-body{flex:1;word-break:break-word}
-.cmt-item-meta{font-size:10px;color:var(--t3);margin-top:2px;font-family:'DM Mono',monospace}
-.cmt-del-btn{flex-shrink:0;background:none;border:1px solid rgba(185,28,28,.25);color:var(--red-t);font-size:11px;padding:2px 7px;border-radius:5px;cursor:pointer;transition:all .12s}
-.cmt-del-btn:hover{background:var(--red-bg);border-color:var(--red)}
 
 /* history */
 .hist-btn{font-size:10px;color:var(--blue);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;display:block;margin-top:3px;text-align:left}
@@ -326,10 +316,27 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
 
 /* inline new task row */
 @keyframes slideInRow{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-#inline-new-task-row{animation:slideInRow .18s ease both}
-#inline-new-task-row td{padding:8px 10px;vertical-align:top}
-#inline-new-task-row .fi{font-size:12px;padding:5px 8px;border-radius:6px}
-#inline-new-task-row input#it-name:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,78,216,.12)}
+.inline-new-task-row{animation:slideInRow .18s ease both}
+.inline-new-task-row td{padding:8px 10px;vertical-align:top}
+.inline-new-task-row .fi{font-size:12px;padding:5px 8px;border-radius:6px}
+.inline-new-task-row input.it-name-field:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,78,216,.12)}
+
+/* per-row add (+) button */
+.add-row-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border-s);background:var(--surface);color:var(--t3);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;line-height:1;padding:0;vertical-align:middle}
+.add-row-btn:hover{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-t);box-shadow:0 0 0 3px rgba(29,78,216,.1);transform:scale(1.12)}
+.add-row-btn:active{transform:scale(.95)}
+
+/* Add New Tasks modal number input */
+.ant-number-input{font-family:'DM Mono',monospace;font-size:16px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--border-s);border-radius:var(--r);outline:none;background:var(--surface);color:var(--text);transition:border-color .15s}
+.ant-number-input:focus{border-color:var(--text);box-shadow:0 0 0 2px rgba(0,0,0,.06)}
+
+/* pagination controls */
+.pagination{display:flex;align-items:center;justify-content:center;gap:4px;padding:0;margin:0}
+.pagination .pg-btn{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;min-width:30px;height:30px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--t2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .12s}
+.pagination .pg-btn:hover:not(:disabled):not(.pg-active){background:var(--s3);border-color:var(--border-m);color:var(--text)}
+.pagination .pg-btn.pg-active{background:var(--text);color:#fff;border-color:var(--text);font-weight:600}
+.pagination .pg-btn:disabled{opacity:.35;cursor:not-allowed}
+.pagination .pg-info{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;padding:0 8px}
 </style>
 </head>
 <body>
@@ -413,17 +420,17 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
             <div class="task-section-title" id="tSecTitle"></div>
             <div class="task-section-sub" id="tSecSub"></div>
           </div>
-          <div class="pg-actions">
+           <div class="pg-actions">
             <button class="btn btn-ghost" onclick="closeTaskSection()"> All Projects</button>
-            <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
+            <button class="btn btn-primary" onclick="openAddTasksModal()">+ New Task</button>
           </div>
         </div>
         <div class="ctrl-bar">
           <div class="sw">
             <svg viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <input class="si" id="tSearch" placeholder="Search tasks, SPOCs, actions"" oninput="renderTasks()">
+            <input class="si" id="tSearch" placeholder="Search tasks, SPOCs, actions"" oninput="currentPage=1;renderTasks()">
           </div>
-          <select class="ctrl" id="tStatusF" onchange="renderTasks()">
+          <select class="ctrl" id="tStatusF" onchange="currentPage=1;renderTasks()">
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
             <option value="inprogress">In Progress</option>
@@ -432,7 +439,7 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
             <option value="blocked">Blocked</option>
             <option value="done">Done</option>
           </select>
-          <select class="ctrl" id="tWhoF" onchange="renderTasks()"><option value="">All SPOCs</option></select>
+          <select class="ctrl" id="tWhoF" onchange="currentPage=1;renderTasks()"><option value="">All SPOCs</option></select>
         </div>
         <div class="tbl-wrap">
           <div class="tbl-scroll">
@@ -446,14 +453,14 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
                 <th class="sort-col" onclick="doSort('deadline')">Deadline (When) </th>
                 <th class="sort-col" onclick="doSort('status')">Status  <span style="font-size:9px;opacity:.5;font-weight:400;text-transform:none;">(editable)</span></th>
                 <th>Comments</th>
-                <th>Support Required</th>
+                <th>Support Needed</th>
                 <th></th>
               </tr></thead>
               <tbody id="tBody"></tbody>
             </table>
           </div>
           <div class="no-tasks" id="tEmpty" style="display:none"><strong>No tasks match your filters</strong>Try clearing the search or status filter</div>
-          <div class="tbl-foot" id="tFoot"></div>
+          <div class="tbl-foot" id="tFoot"><span id="tFootText"></span><div class="pagination" id="tPagination"></div></div>
         </div>
       </div>
     </div>
@@ -557,10 +564,6 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
       </select>
     </div>
     <div class="field"><label class="field-label">Support Required</label><input class="fi" id="tmSupport" placeholder="e.g. Approval from Patil ji"></div>
-    <div class="field" id="tmCommentsSection" style="display:none">
-      <label class="field-label">Comments</label>
-      <div id="tmCommentsList"></div>
-    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalTask')">Cancel</button>
       <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
@@ -621,6 +624,23 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalDel')">Cancel</button>
       <button class="btn btn-danger" id="delConfirmBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD NEW TASKS MODAL -->
+<div class="modal-ov modal-sm" id="modalAddTasks">
+  <div class="modal">
+    <div class="modal-title">Add New Rows</div>
+    <div class="modal-sub">How many task rows do you want to add at once?<br>(maximum 30)</div>
+    <div class="field">
+      <label class="field-label">Number of Rows</label>
+      <input type="number" class="ant-number-input" id="antRowCount" min="1" max="30" value="5">
+      <div class="field-hint" style="margin-top:8px">Empty rows are skipped when you save.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modalAddTasks')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmAddTaskRows()">Add rows</button>
     </div>
   </div>
 </div>
