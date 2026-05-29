@@ -61,25 +61,36 @@ router.get('/people', async (request, response) => {
     }
 });
 
-// POST /api/auth/login — Login by selecting a name
+// POST /api/auth/login — Login by email + password
 router.post('/login', async (request, response) => {
     try {
-        const { name } = request.body;
-        if (!name) {
-            return response.status(400).json({ error: 'Name is required' });
+        const { email, password } = request.body;
+        if (!email || !password) {
+            return response.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Find the user
+        // Find the user by email
         const userResult = await pool.query(
-            'SELECT id, name, email FROM users WHERE name = $1 AND deleted_at IS NULL',
-            [name]
+            'SELECT id, name, email, password_hash FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL',
+            [email]
         );
 
         if (userResult.rows.length === 0) {
-            return response.status(404).json({ error: 'User not found' });
+            return response.status(401).json({ error: 'Invalid email or password' });
         }
 
         const user = userResult.rows[0];
+
+        // Verify password with bcrypt
+        if (!user.password_hash) {
+            return response.status(401).json({ error: 'No password set for this account. Contact admin.' });
+        }
+
+        const bcrypt = require('bcrypt');
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch) {
+            return response.status(401).json({ error: 'Invalid email or password' });
+        }
 
         // Resolve effective role from normalized role tables
         const roleResult = await pool.query(`

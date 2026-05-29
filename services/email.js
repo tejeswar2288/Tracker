@@ -23,7 +23,7 @@ function createTransporter() {
 
     if (isOutlook) {
         return nodemailer.createTransport({
-            host:   'smtp-mail.outlook.com',
+            host:   'smtp.office365.com',
             port:   587,
             secure: false,
             auth: {
@@ -119,9 +119,12 @@ async function sendTaskReminder({ task, project, assigneeEmails, assigneeNames, 
 
     const info = await transporter.sendMail({
         from:    `"WWW Task Tracker" <${process.env.MAIL_USER}>`,
+        replyTo: `"${senderName}" <${process.env.MAIL_USER}>`,
         to:      assigneeEmails.join(', '),
         subject: `${alert.icon} Task Reminder — ${task.activity}`,
         html,
+        text: `Task Reminder: ${task.activity}\nProject: ${project.name}\n${deadlineMessage}\n\nPlease check the tracker for more details.`,
+        messageId: `<${Date.now()}.${Math.random().toString(36).substring(2)}@tasktracker.local>`,
     });
 
     return info;

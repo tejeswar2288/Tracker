@@ -38,34 +38,37 @@ function hasRoleCap(role, cap) { return !!(ROLE_CAPS[role] && ROLE_CAPS[role][ca
 
 // -- LOGIN --
 async function buildLoginDropdown() {
+  // Still load all users for other parts of the app (task assignment etc.)
   try {
     ALL_USERS = await api('GET','/auth/people');
-    const sel = document.getElementById('loginSel');
-    sel.innerHTML = '<option value="">-- choose your name --</option>';
-    ALL_USERS.forEach(u => { const o=document.createElement('option'); o.value=u.name; o.textContent=u.name; sel.appendChild(o); });
   } catch(e) { console.error('Failed to load users:', e); }
 }
 
-function onSelectName() {
-  const name = document.getElementById('loginSel').value;
-  const btn=document.getElementById('loginBtn'), dot=document.getElementById('roleDot'), txt=document.getElementById('roleText');
-  if(!name){ btn.disabled=true; dot.style.background='var(--border-s)'; txt.style.color='var(--t3)'; txt.textContent='Select your name to continue'; return; }
-  btn.disabled=false;
-  const user = ALL_USERS.find(u=>u.name===name);
-  const role = user ? user.role : 'doer';
-  const roleMap = {
-    admin:{dot:'#6d28d9',text:'System Administrator - full access to all projects & tasks.',color:'var(--purple-t)'},
-    manager:{dot:'#15803d',text:'Project Manager - you can create, edit and close tasks.',color:'var(--green-t)'},
-    doer:{dot:'#1d4ed8',text:"Task Doer - you'll see only tasks assigned to your name.",color:'var(--blue-t)'},
-  };
-  const rm = roleMap[role]||roleMap.doer;
-  dot.style.background=rm.dot; txt.style.color=rm.color; txt.textContent=rm.text;
+function onLoginInput() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn');
+  const dot = document.getElementById('roleDot');
+  const txt = document.getElementById('roleText');
+  if(email && password) {
+    btn.disabled = false;
+    dot.style.background = '#15803d';
+    txt.style.color = 'var(--green-t)';
+    txt.textContent = 'Ready to log in';
+  } else {
+    btn.disabled = true;
+    dot.style.background = 'var(--border-s)';
+    txt.style.color = 'var(--t3)';
+    txt.textContent = 'Enter your credentials to continue';
+  }
 }
 
 async function doLogin() {
-  const name = document.getElementById('loginSel').value; if(!name) return;
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if(!email || !password) return;
   try {
-    const user = await api('POST','/auth/login',{name});
+    const user = await api('POST','/auth/login',{email, password});
     S = {id:user.id, name:user.name, role:user.role, managedProjects:user.managedProjects||[]};
     // Load role caps
     const caps = await api('GET','/role-capabilities');
@@ -73,13 +76,17 @@ async function doLogin() {
     caps.forEach(c => { ROLE_CAPS[c.role] = c; });
     document.getElementById('loginScreen').style.display='none';
     const app=document.getElementById('appShell'); app.style.display='flex'; app.style.flexDirection='column';
-    const initials=name.split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const initials=user.name.split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
     document.getElementById('uAvatar').textContent=initials;
-    document.getElementById('uName').textContent=name;
+    document.getElementById('uName').textContent=user.name;
     document.getElementById('uRole').textContent={admin:'Admin',manager:'Manager',doer:'Task Doer'}[S.role]||S.role;
     buildTabs();
     switchTab(S.role==='doer'?'doer':'manager');
-  } catch(e) { alert('Login failed: '+e.message); }
+  } catch(e) { 
+    document.getElementById('roleDot').style.background='#b91c1c';
+    document.getElementById('roleText').style.color='var(--red-t)';
+    document.getElementById('roleText').textContent=e.message || 'Invalid email or password';
+  }
 }
 
 async function doLogout() {
@@ -88,11 +95,12 @@ async function doLogout() {
   selectedProjId=null;
   document.getElementById('appShell').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('loginSel').value='';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPassword').value='';
   document.getElementById('loginBtn').disabled=true;
   document.getElementById('roleDot').style.background='var(--border-s)';
   document.getElementById('roleText').style.color='var(--t3)';
-  document.getElementById('roleText').textContent='Select your name to continue';
+  document.getElementById('roleText').textContent='Enter your credentials to continue';
   buildLoginDropdown();
 }
 
@@ -155,7 +163,7 @@ async function renderDoer() {
           <td><textarea class="cmt-ta" rows="2" placeholder="Add a comment..." onblur="saveCmt('${t.id}',this,'dcmtts-${t.id}')" ${hasRoleCap('doer','add_comments')?'':'readonly'}></textarea><div class="cmt-ts" id="dcmtts-${t.id}"></div></td>
         </tr>`;
       }).join('');
-      html+=`<div class="doer-proj-wrap"><div class="doer-proj-hd"><div class="doer-proj-title"><span style="width:10px;height:10px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0;"></span>${pg.name}</div><div class="doer-proj-prog"><div class="doer-prog-mini"><div class="doer-prog-fill" style="width:${pct}%;background:${col}"></div></div><span>${done2}/${pg.tasks.length} done</span></div></div><div class="tbl-scroll"><table><thead><tr><th>#</th><th>Task</th><th>SPOC</th><th>Priority</th><th>Deadline</th><th>Status</th><th>Comments</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      html+=`<div class="doer-proj-wrap"><div class="doer-proj-hd"><div class="doer-proj-title"><span style="width:10px;height:10px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0;"></span>${pg.name}</div><div class="doer-proj-prog"><div class="doer-prog-mini"><div class="doer-prog-fill" style="width:${pct}%;background:${col}"></div></div><span>${done2}/${pg.tasks.length} done</span></div></div><div class="tbl-scroll"><table class="doer-table"><thead><tr><th>#</th><th>Task</th><th>SPOC</th><th>Priority</th><th>Deadline</th><th>Status</th><th>Comments</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
     });
     document.getElementById('doerContent').innerHTML=html;
   } catch(e){ document.getElementById('doerContent').innerHTML=`<div class="doer-proj-wrap"><div class="doer-empty"><strong>Error loading tasks</strong>${e.message}</div></div>`; }
@@ -239,9 +247,12 @@ async function renderTasks() {
     let tasks = await api('GET',`/tasks?project_id=${selectedProjId}`);
     if(q) tasks=tasks.filter(t=>[t.activity,t.action_steps,t.support_needed,t.assignees].join(' ').toLowerCase().includes(q));
     if(sf) tasks=tasks.filter(t=>t.status===sf);
-    // Populate SPOC filter
+    // Populate SPOC filter without losing the current selection
+    const prevSw = document.getElementById('tWhoF').value;
     const spocs=new Set(); tasks.forEach(t=>(t.assignees||'').split(' / ').filter(Boolean).forEach(s=>spocs.add(s)));
     document.getElementById('tWhoF').innerHTML='<option value="">All SPOCs</option>'+[...spocs].sort().map(s=>`<option value="${s}">${s}</option>`).join('');
+    document.getElementById('tWhoF').value = prevSw;
+    
     const sw=document.getElementById('tWhoF').value;
     if(sw) tasks=tasks.filter(t=>(t.assignees||'').toLowerCase().includes(sw.toLowerCase()));
     // Tasks are returned in creation order (created_at ASC) from the backend — no client sort
@@ -365,9 +376,19 @@ async function sendTaskMail(taskId, activityName) {
 }
 
 async function saveCmt(taskId,ta,tsId){
-  const content=typeof ta==='string'?document.getElementById(ta).value:ta.value;
+  const el=typeof ta==='string'?document.getElementById(ta):ta;
+  const content=el.value;
   if(!content.trim())return;
-  try{await api('POST',`/tasks/${taskId}/comments`,{content});const el=document.getElementById(tsId);if(el)el.textContent='Saved '+fmtTs(Date.now());showSaved();}
+  try{
+    await api('POST',`/tasks/${taskId}/comments`,{content});
+    const tsEl=document.getElementById(tsId);if(tsEl)tsEl.textContent='Saved '+fmtTs(Date.now());
+    // Update the Support Needed cell in the same row
+    const row=el.closest('tr');
+    if(row){const supCell=row.querySelector('.sup-cell');if(supCell)supCell.textContent=content.trim();}
+    // Clear the comment textarea after saving
+    el.value='';
+    showSaved();
+  }
   catch(e){alert('Failed to save comment: '+e.message);}
 }
 
@@ -420,27 +441,30 @@ function confirmDelProject(pid,name){
 
 // -- TASK CRUD ------------------------------------------
 let _inlineRowCounter=0;
+let _inlineSavedCount=0;
 
 function _createInlineRowHtml(uid, num){
   const userOpts=ALL_USERS.map(u=>`<option value="${u.name}">${u.name}</option>`).join('');
   const statusOpts=Object.entries(STAT_LABELS).map(([v,l])=>`<option value="${v}"${v==='pending'?' selected':''}>${l}</option>`).join('');
   return `
     <td class="rn" style="color:var(--blue-t);font-weight:700">${num}</td>
-    <td><input class="fi it-name-field" data-uid="${uid}" style="min-width:160px;font-size:12px;padding:5px 8px" placeholder="Task / Activity name *"></td>
-    <td><textarea class="fi it-what-field" data-uid="${uid}" rows="2" style="min-width:140px;font-size:12px;padding:5px 8px;resize:none" placeholder="Action steps"></textarea></td>
-    <td><input class="fi it-who-field" data-uid="${uid}" style="min-width:110px;font-size:12px;padding:5px 8px" list="it-who-list-${uid}" placeholder="SPOC name"><datalist id="it-who-list-${uid}">${userOpts}</datalist></td>
-    <td><select class="ssel prio-sel prio-med it-priority-field" data-uid="${uid}" style="min-width:100px">
+    <td><textarea class="fi it-name-field" data-uid="${uid}" rows="1" placeholder="Task / Activity name *"></textarea></td>
+    <td><textarea class="fi it-what-field" data-uid="${uid}" rows="1" placeholder="Action steps"></textarea></td>
+    <td><input class="fi it-who-field" data-uid="${uid}" list="it-who-list-${uid}" placeholder="SPOC name"><datalist id="it-who-list-${uid}">${userOpts}</datalist></td>
+    <td><select class="ssel prio-sel prio-med it-priority-field" data-uid="${uid}">
       <option value="high">High</option>
       <option value="medium" selected>Medium</option>
       <option value="low">Low</option>
     </select></td>
-    <td><input class="fi it-dl-field" data-uid="${uid}" type="date" style="font-size:12px;padding:5px 8px"></td>
-    <td><select class="ssel ss-pending it-status-field" data-uid="${uid}" style="min-width:115px">${statusOpts}</select></td>
-    <td><textarea class="cmt-ta it-comment-field" data-uid="${uid}" rows="2" placeholder="Comment (optional)"></textarea></td>
-    <td><input class="fi it-support-field" data-uid="${uid}" style="min-width:110px;font-size:12px;padding:5px 8px" placeholder="Support needed"></td>
-    <td style="white-space:nowrap;vertical-align:middle">
-      <button class="btn btn-primary btn-sm" onclick="saveInlineRow('${uid}')">Save</button>
-      <button class="btn btn-sm" style="margin-left:4px" onclick="cancelInlineRow('${uid}')">Cancel</button>
+    <td><input class="fi it-dl-field" data-uid="${uid}" type="date"></td>
+    <td><select class="ssel ss-pending it-status-field" data-uid="${uid}">${statusOpts}</select></td>
+    <td><textarea class="cmt-ta it-comment-field" data-uid="${uid}" rows="1" placeholder="Comment (optional)"></textarea></td>
+    <td><textarea class="fi it-support-field" data-uid="${uid}" rows="1" placeholder="Support needed"></textarea></td>
+    <td>
+      <div class="it-actions">
+        <button class="btn btn-primary btn-sm" onclick="saveInlineRow('${uid}')">Save</button>
+        <button class="btn btn-sm" onclick="cancelInlineRow('${uid}')">Cancel</button>
+      </div>
     </td>`;
 }
 
@@ -449,7 +473,7 @@ function _insertInlineRow(afterElement, num){
   const row=document.createElement('tr');
   row.id=uid;
   row.className='inline-new-task-row';
-  row.style.background='var(--blue-bg)';
+  row.style.background='var(--surface)';
   row.innerHTML=_createInlineRowHtml(uid, num);
   const tbody=document.getElementById('tBody');
   if(afterElement && afterElement.nextSibling){
@@ -461,6 +485,19 @@ function _insertInlineRow(afterElement, num){
   // live color updates
   row.querySelector('.it-priority-field').addEventListener('change',function(){this.className=`ssel prio-sel ${PRIO_CLS[this.value]||'prio-med'} it-priority-field`;});
   row.querySelector('.it-status-field').addEventListener('change',function(){this.className=`ssel ${STAT_CLS[this.value]||'ss-pending'} it-status-field`;});
+  // auto-expand text inputs on typing
+  row.querySelectorAll('.it-name-field,.it-what-field,.it-who-field,.it-support-field').forEach(inp=>{
+    inp.addEventListener('input',function(){
+      // Use a hidden measurer to check if content overflows
+      this.style.height='auto';
+      if(this.scrollHeight>this.clientHeight){
+        this.style.height=this.scrollHeight+'px';
+      }
+    });
+  });
+  // auto-expand comment textarea
+  const cmt=row.querySelector('.it-comment-field');
+  if(cmt) cmt.addEventListener('input',function(){this.style.height='auto';this.style.height=this.scrollHeight+'px';});
   return row;
 }
 
@@ -492,6 +529,7 @@ async function saveInlineRow(uid){
   if(!activity){nameEl.focus();nameEl.style.borderColor='var(--red)';return;}
   const whoNames=(row.querySelector('.it-who-field').value||'').split(/[\/,+&]/).map(s=>s.trim()).filter(Boolean);
   const assignee_ids=ALL_USERS.filter(u=>whoNames.some(n=>n.toLowerCase()===u.name.toLowerCase())).map(u=>u.id);
+  const assigneeNames=whoNames.join(' / ')||'-';
   const data={
     activity,
     action_steps:(row.querySelector('.it-what-field').value||'').trim(),
@@ -503,13 +541,53 @@ async function saveInlineRow(uid){
     project_id:selectedProjId
   };
   try{
-    await api('POST','/tasks',data);
-    row.remove();
+    const saved=await api('POST','/tasks',data);
+    _inlineSavedCount++;
     showSaved();
-    renderTasks();
-    renderDoer();
-    renderManager();
-    buildTabs();
+    // Convert inline row into a normal task row in-place
+    const canEdit=S.role==='admin'||(S.role==='manager'&&S.managedProjects.includes(selectedProjId));
+    const canComment=hasRoleCap(S.role,'add_comments');
+    const t={...saved, activity:data.activity, action_steps:data.action_steps, priority:data.priority, deadline:data.deadline, status:data.status, support_needed:data.support_needed, assignees:assigneeNames, id:saved.id};
+    const rowNum=row.querySelector('td.rn').textContent;
+    const dc=dlCls(t.deadline),dn=dlNote(t.deadline),sc=STAT_CLS[t.status]||'ss-pending';
+    const sopts=Object.entries(STAT_LABELS).map(([v,l])=>`<option value="${v}"${t.status===v?' selected':''}>${l}</option>`).join('');
+    const prioCls=PRIO_CLS[t.priority]||'prio-med';
+    const dlCell=`<span class="dl-badge ${dc}" id="dl-badge-${t.id}">${fmt(t.deadline)}</span>`;
+    const addBtn=canEdit?`<button class="add-row-btn" title="Insert new task below" onclick="addInlineTaskAfter('${t.id}',this)">+</button>`:'';
+    row.className='';
+    row.removeAttribute('id');
+    row.style.background='';
+    row.setAttribute('data-task-id',t.id);
+    row.innerHTML=`
+        <td class="rn">${rowNum}</td>
+        <td><div class="task-act"><span class="task-dot ${STAT_DOT[t.status]}"></span>${t.activity}</div></td>
+        <td><div class="task-what">${t.action_steps||'-'}</div></td>
+        <td class="who-cell">${t.assignees||'-'}</td>
+        <td><select class="ssel prio-sel ${prioCls}" onchange="changePriority('${t.id}',this.value)" ${canEdit?'':'disabled'}><option value="high"${t.priority==='high'?' selected':''}>High</option><option value="medium"${t.priority==='medium'?' selected':''}>Medium</option><option value="low"${t.priority==='low'?' selected':''}>Low</option></select></td>
+        <td>${dlCell}<div class="dl-note" id="dl-note-${t.id}">${dn}</div></td>
+        <td><select class="ssel ${sc}" onchange="mgrStatusChange('${t.id}','${t.activity.replace(/'/g,"\\\\'")}',this.value,this,'${t.deadline||''}')" ${canEdit?'':'disabled'}>${sopts}</select></td>
+        <td><textarea class="cmt-ta" rows="2" placeholder="Add comment..." onblur="saveCmt('${t.id}',this,'mcmtts-${t.id}')" ${canComment?'':'readonly'}></textarea><div class="cmt-ts" id="mcmtts-${t.id}"></div></td>
+        <td class="sup-cell">${t.support_needed||'-'}</td>
+        <td style="white-space:nowrap">
+          ${canEdit?`<button class="btn btn-sm" onclick="openTaskModal('${t.id}')">Edit</button> `:''}
+          ${S.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="confirmDelTask('${t.id}','${t.activity.replace(/'/g,"\\\\'")}')">Del</button> `:''}
+          <button class="btn btn-sm btn-mail" title="Send reminder email" onclick="sendTaskMail('${t.id}','${t.activity.replace(/'/g,"\\\\'")}')">&#9993;</button>
+          ${addBtn}
+        </td>`;
+    // Brief green flash to confirm save
+    row.style.animation='flashGreen .5s ease';
+    setTimeout(()=>row.style.animation='',600);
+    // Renumber remaining inline rows
+    _renumberInlineRows();
+    // If no inline rows left, do full refresh to sync everything
+    const remaining=document.querySelectorAll('.inline-new-task-row');
+    if(remaining.length===0){
+      _inlineSavedCount=0;
+      renderTasks();
+      renderDoer();
+      renderManager();
+      buildTabs();
+    }
   }catch(e){alert('Failed to save task: '+e.message);}
 }
 
@@ -523,7 +601,7 @@ function cancelInlineRow(uid){
 // Renumber all inline rows sequentially after any add/remove
 function _renumberInlineRows(){
   const rows=document.querySelectorAll('.inline-new-task-row');
-  const base=currentTasksCache.length;
+  const base=currentTasksCache.length+_inlineSavedCount;
   rows.forEach((r,i)=>{
     const td=r.querySelector('td.rn');
     if(td) td.textContent=String(base+i+1).padStart(2,'0');
@@ -533,6 +611,12 @@ function _renumberInlineRows(){
 // Cancel ALL inline rows
 function cancelAllInlineRows(){
   document.querySelectorAll('.inline-new-task-row').forEach(r=>r.remove());
+  if(_inlineSavedCount>0){
+    _inlineSavedCount=0;
+    renderTasks();
+    renderManager();
+    buildTabs();
+  }
 }
 
 // -- ADD TASKS MODAL ---------------------------
@@ -683,4 +767,33 @@ async function saveNewUser(){
 function toggleHist(id){const el=document.getElementById(id);if(el)el.classList.toggle('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-ov').forEach(el=>el.addEventListener('click',function(e){if(e.target===this)closeModal(this.id);}));
-buildLoginDropdown();
+
+// On page load: check if user already has an active session
+(async function boot() {
+  try {
+    const me = await api('GET','/auth/me');
+    if(me && me.id) {
+      // Session is still valid — restore it
+      S = {id:me.id, name:me.name, role:me.role, managedProjects:me.managedProjects||[]};
+      ALL_USERS = await api('GET','/auth/people');
+      const caps = await api('GET','/role-capabilities');
+      ROLE_CAPS = {};
+      caps.forEach(c => { ROLE_CAPS[c.role] = c; });
+      document.getElementById('loginScreen').style.display='none';
+      const app=document.getElementById('appShell'); app.style.display='flex'; app.style.flexDirection='column';
+      const initials=me.name.split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
+      document.getElementById('uAvatar').textContent=initials;
+      document.getElementById('uName').textContent=me.name;
+      document.getElementById('uRole').textContent={admin:'Admin',manager:'Manager',doer:'Task Doer'}[S.role]||S.role;
+      buildTabs();
+      switchTab(S.role==='doer'?'doer':'manager');
+      return;
+    }
+  } catch(e) {
+    // No active session — fall through to login screen
+  }
+  // Show login screen
+  document.getElementById('loginScreen').style.display='flex';
+  buildLoginDropdown();
+})();
+

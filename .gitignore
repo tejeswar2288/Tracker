@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 *.pem
 app_analysis_v2.md
+create_tables.sql
+seed_users.sql

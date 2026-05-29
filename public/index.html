@@ -202,23 +202,44 @@ select.ctrl:focus{border-color:var(--text)}
 /*  TASK TABLE  */
 .tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh)}
 .tbl-scroll{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
 thead tr{background:var(--s2);border-bottom:1px solid var(--border)}
-th{text-align:left;padding:9px 12px;font-size:10px;font-weight:600;letter-spacing:.55px;text-transform:uppercase;color:var(--t3);white-space:nowrap;user-select:none}
+th{text-align:left;padding:9px 8px;font-size:10px;font-weight:600;letter-spacing:.55px;text-transform:uppercase;color:var(--t3);white-space:nowrap;user-select:none;overflow:hidden;text-overflow:ellipsis}
 th.sort-col{cursor:pointer}th.sort-col:hover{color:var(--text)}
 tbody tr{border-bottom:1px solid var(--border);transition:background .08s}
 tbody tr:last-child{border-bottom:none}
 tbody tr:hover{background:var(--s2)}
-td{padding:9px 12px;vertical-align:top}
-.rn{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)}
+td{padding:9px 8px;vertical-align:top;overflow:hidden;word-wrap:break-word}
+.rn{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);width:32px}
+/* column widths */
+th:nth-child(1),td:nth-child(1){width:32px}
+th:nth-child(2),td:nth-child(2){width:14%}
+th:nth-child(3),td:nth-child(3){width:14%}
+th:nth-child(4),td:nth-child(4){width:9%}
+th:nth-child(5),td:nth-child(5){width:8%}
+th:nth-child(6),td:nth-child(6){width:10%}
+th:nth-child(7),td:nth-child(7){width:10%}
+th:nth-child(8),td:nth-child(8){width:12%}
+th:nth-child(9),td:nth-child(9){width:10%}
+th:nth-child(10),td:nth-child(10){width:auto}
+
+/* doer table column widths (7 columns) */
+.doer-table{table-layout:auto}
+.doer-table th:nth-child(1),.doer-table td:nth-child(1){width:36px}
+.doer-table th:nth-child(2),.doer-table td:nth-child(2){width:24%}
+.doer-table th:nth-child(3),.doer-table td:nth-child(3){width:14%}
+.doer-table th:nth-child(4),.doer-table td:nth-child(4){width:10%}
+.doer-table th:nth-child(5),.doer-table td:nth-child(5){width:12%}
+.doer-table th:nth-child(6),.doer-table td:nth-child(6){width:12%}
+.doer-table th:nth-child(7),.doer-table td:nth-child(7){width:auto}
 
 /* task cells */
 .task-act{font-weight:500;color:var(--text);line-height:1.4;display:flex;align-items:flex-start;gap:6px}
 .task-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
 .d-pending{background:#94a3b8}.d-inprogress{background:var(--blue)}.d-review{background:var(--purple)}.d-deferred{background:var(--amber)}.d-blocked{background:var(--red)}.d-done{background:var(--green)}
-.task-what{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5;max-width:270px}
-.who-cell{font-size:12px;color:var(--t2);max-width:140px;line-height:1.5}
-.sup-cell{font-size:12px;color:var(--t3);font-style:italic;max-width:160px}
+.task-what{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5}
+.who-cell{font-size:12px;color:var(--t2);line-height:1.5}
+.sup-cell{font-size:12px;color:var(--t3);font-style:italic}
 
 /* deadline */
 .dl-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:11px;padding:2px 8px;border-radius:5px;white-space:nowrap}
@@ -228,7 +249,7 @@ input.dl-edit{font-family:'DM Mono',monospace;font-size:11px;padding:3px 7px;bor
 input.dl-edit:focus{box-shadow:0 0 0 2px rgba(180,83,9,.2)}
 
 /* status select */
-select.ssel{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;padding:3px 20px 3px 8px;border-radius:6px;border:1px solid transparent;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;min-width:115px;transition:border-color .15s}
+select.ssel{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;padding:3px 20px 3px 8px;border-radius:6px;border:1px solid transparent;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;min-width:0;width:100%;transition:border-color .15s}
 select.ssel:hover{border-color:rgba(0,0,0,.2)}
 select.ssel:disabled{opacity:.55;cursor:default}
 .ss-pending{background:#f1f5f9;color:#475569;border-color:rgba(0,0,0,.08)}
@@ -246,12 +267,12 @@ td:has(.prio-badge),td:has(.prio-sel){text-align:left}
 .prio-high{background:var(--red-bg);color:var(--red-t)}
 .prio-med{background:var(--amber-bg);color:var(--amber-t)}
 .prio-low{background:var(--green-bg);color:var(--green-t)}
-select.prio-sel{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;padding:3px 20px 3px 8px;border-radius:6px;border:1px solid transparent;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;width:120px;transition:border-color .15s}
+select.prio-sel{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;padding:3px 18px 3px 6px;border-radius:6px;border:1px solid transparent;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;width:100%;max-width:90px;transition:border-color .15s}
 select.prio-sel:hover{border-color:rgba(0,0,0,.2)}
 select.prio-sel:disabled{opacity:.55;cursor:default}
 
 /* comments */
-textarea.cmt-ta{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--t2);background:transparent;border:1px dashed var(--border-s);border-radius:6px;padding:4px 7px;resize:none;width:170px;min-height:36px;outline:none;transition:all .15s;line-height:1.5}
+textarea.cmt-ta{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--t2);background:transparent;border:1px dashed var(--border-s);border-radius:6px;padding:4px 7px;resize:none;width:100%;min-height:36px;outline:none;transition:all .15s;line-height:1.5}
 textarea.cmt-ta:hover{background:var(--s2)}
 textarea.cmt-ta:focus{border-color:var(--blue);background:var(--surface);border-style:solid}
 textarea.cmt-ta::placeholder{color:var(--t3);font-style:italic}
@@ -316,10 +337,14 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
 
 /* inline new task row */
 @keyframes slideInRow{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-.inline-new-task-row{animation:slideInRow .18s ease both}
-.inline-new-task-row td{padding:8px 10px;vertical-align:top}
-.inline-new-task-row .fi{font-size:12px;padding:5px 8px;border-radius:6px}
+.inline-new-task-row{animation:slideInRow .18s ease both;border-bottom:6px solid var(--s2) !important}
+.inline-new-task-row td{padding:10px 8px;vertical-align:top}
+.inline-new-task-row .fi{font-size:12px;padding:6px 7px;border-radius:6px;width:100%;box-sizing:border-box}
 .inline-new-task-row input.it-name-field:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,78,216,.12)}
+.inline-new-task-row select.ssel{width:100%;min-width:0}
+.inline-new-task-row select.prio-sel{max-width:none;width:100%}
+.inline-new-task-row .it-actions{display:flex;gap:4px;justify-content:flex-end;align-items:flex-start;padding-top:2px}
+.inline-new-task-row textarea.fi{min-height:0;height:auto;resize:none;overflow:hidden;line-height:1.5}
 
 /* per-row add (+) button */
 .add-row-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border-s);background:var(--surface);color:var(--t3);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;line-height:1;padding:0;vertical-align:middle}
@@ -342,18 +367,18 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
 <body>
 
 <!--  LOGIN  -->
-<div id="loginScreen">
+<div id="loginScreen" style="display: none;">
   <div class="lc">
     <div class="lc-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="8" width="3" height="7" rx="1" fill="#fff"/><rect x="6" y="5" width="3" height="10" rx="1" fill="#fff"/><rect x="11" y="2" width="3" height="13" rx="1" fill="#fff"/></svg></div>
     <div class="lc-title">WWW Task Tracker</div>
     <div class="lc-sub">Who does What by When</div>
-    <label class="lc-label">Select your name</label>
-    <select class="lc-sel" id="loginSel" onchange="onSelectName()">
-      <option value="">-- choose your name --</option>
-    </select>
+    <label class="lc-label">Email</label>
+    <input class="fi" type="email" id="loginEmail" placeholder="you@example.com" style="margin-bottom:14px" oninput="onLoginInput()">
+    <label class="lc-label">Password</label>
+    <input class="fi" type="password" id="loginPassword" placeholder="Enter your password" style="margin-bottom:14px" oninput="onLoginInput()" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="lc-role-info" id="roleInfo">
       <span class="lc-role-dot" id="roleDot" style="background:var(--border-s)"></span>
-      <span id="roleText" style="color:var(--t3)">Select your name to continue</span>
+      <span id="roleText" style="color:var(--t3)">Enter your credentials to continue</span>
     </div>
     <button class="lc-btn" id="loginBtn" onclick="doLogin()" disabled>Enter Tracker</button>
   </div>
@@ -406,7 +431,6 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
             <div class="pg-sub" id="mgrSub"></div>
           </div>
           <div class="pg-actions">
-            <button class="btn" id="btnNewUser" onclick="openNewUserModal()" style="display:none">+ New User</button>
             <button class="btn btn-primary" id="btnNewProj" onclick="openProjModal()" disabled>+ New Project</button>
           </div>
         </div>
@@ -563,7 +587,14 @@ textarea.fi{resize:vertical;min-height:74px;line-height:1.5}
         <option value="done">Done / Closed</option>
       </select>
     </div>
-    <div class="field"><label class="field-label">Support Required</label><input class="fi" id="tmSupport" placeholder="e.g. Approval from Patil ji"></div>
+    <div class="field">
+      <label class="field-label">Support Needed</label>
+      <textarea class="fi" id="tmSupport" rows="2" placeholder="Latest comment will appear here"></textarea>
+      <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm btn-danger" type="button" onclick="document.getElementById('tmSupport').value=''">Clear</button>
+        <span class="field-hint" style="margin:0">Clear to remove from Support Needed column</span>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalTask')">Cancel</button>
       <button class="btn btn-primary" onclick="saveTask()">Save Task</button>

@@ -372,6 +372,12 @@ router.post('/:id/comments', async (request, response) => {
             [taskId, authorId, content.trim()]
         );
 
+        // Also update the support_needed column so the latest comment reflects there
+        await pool.query(
+            'UPDATE tasks SET support_needed = $1, updated_at = NOW() WHERE id = $2',
+            [content.trim(), taskId]
+        );
+
         response.status(201).json(result.rows[0]);
     } catch (error) {
         console.error('Error adding comment:', error);
